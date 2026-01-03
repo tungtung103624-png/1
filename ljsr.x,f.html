@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>六年級英語單字聽力王</title>
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --success: #27AE60;
+            --error: #E74C3C;
+            --bg: #F0F4F8;
+        }
+        body { 
+            font-family: 'Segoe UI', Microsoft JhengHei, sans-serif;
+            background: var(--bg); margin: 0; display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+        }
+        .container {
+            background: white; width: 95%; max-width: 500px; padding: 25px;
+            border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .header { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 18px; font-weight: bold; }
+        .progress-bar { height: 10px; background: #eee; border-radius: 5px; margin-bottom: 20px; overflow: hidden; }
+        #progress { height: 100%; background: var(--primary); width: 0%; transition: 0.3s; }
+        
+        #speaker-btn {
+            width: 80px; height: 80px; border-radius: 50%; border: none;
+            background: var(--primary); color: white; font-size: 40px;
+            cursor: pointer; box-shadow: 0 5px 15px rgba(74,144,226,0.3);
+            margin: 15px 0; transition: transform 0.2s;
+        }
+        #speaker-btn:active { transform: scale(0.9); }
+
+        .options { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 20px; }
+        .opt-btn {
+            padding: 15px; font-size: 20px; border: 2px solid #E1E8ED;
+            border-radius: 12px; background: white; cursor: pointer;
+            transition: all 0.2s; font-weight: 500;
+        }
+        .opt-btn:hover { border-color: var(--primary); background: #F0F7FF; }
+        
+        /* 動效 */
+        .shake { animation: shake 0.4s; background-color: #ffebee; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        .correct { background-color: #e8f5e9 !important; border-color: var(--success) !important; }
+
+        .result-screen { display: none; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container" id="game-ui">
+    <div class="header">
+        <span style="color: var(--primary)">🏆 分數: <span id="score">0</span></span>
+        <span style="color: #666">第 <span id="current-idx">1</span> / 100 題</span>
+    </div>
+    <div class="progress-bar"><div id="progress"></div></div>
+
+    <div id="quiz-area">
+        <button id="speaker-btn">🔊</button>
+        <p>點擊上方按鈕聽音，選出正確單字</p>
+        <div class="options" id="options-box"></div>
+    </div>
+</div>
+
+<div class="container result-screen" id="result-ui">
+    <h1>🎉 挑戰完成！</h1>
+    <h2 id="final-rank">等級：單字大師</h2>
+    <p style="font-size: 24px;">最終得分：<span id="final-score">0</span></p>
+    <button class="opt-btn" style="width:100%; background: var(--primary); color:white;" onclick="location.reload()">再玩一次</button>
+</div>
+
+<script>
+    // 100 個六年級核心單字
+    const rawWords = [
+        "Brave","Honest","Lazy","Nervous","Proud","Creative","Helpful","Boring","Excited","Famous",
+        "Careful","Friendly","Smart","Strong","Weak","Science","History","Geography","Dictionary","Project",
+        "Homework","Lesson","Language","Library","Gym","Uniform","Grade","Practice","Exam","Knowledge",
+        "Astronaut","Engineer","Scientist","Artist","Reporter","Pilot","Vet","Officer","Manager","Neighbor",
+        "Stranger","Customer","Coach","Soldier","Musician","Breakfast","Experience","Exercise","Travel","Celebrate",
+        "Hobby","Chore","Garbage","Environment","Health","Habit","Schedule","Vacation","Shopping","Internet",
+        "Airport","Hospital","Museum","Theater","Factory","Restaurant","Subway","Motorcycle","Bridge","Traffic",
+        "Island","Desert","Mountain","Planet","Direction","Believe","Choose","Decide","Explain","Imagine",
+        "Improve","Remember","Forget","Protect","Reduce","Recycle","Succeed","Collect","Discover","Share",
+        "Computer","Smartphone","Camera","Invention","Tool","Plastic","Energy","Message","Electric","System"
+    ];
+
+    let score = 0;
+    let currentIdx = 0;
+    let gameWords = [];
+
+    function initGame() {
+        // 洗牌 100 個單字
+        gameWords = [...rawWords].sort(() => Math.random() - 0.5);
+        showQuestion();
+    }
+
+    function showQuestion() {
+        if (currentIdx >= gameWords.length) {
+            showResult();
+            return;
+        }
+
+        const correctWord = gameWords[currentIdx];
+        document.getElementById('current-idx').innerText = currentIdx + 1;
+        document.getElementById('progress').style.width = `${(currentIdx / 100) * 100}%`;
+
+        // 生成干擾項 (隨機找另外兩個不重複的字)
+        let distractors = rawWords.filter(w => w !== correctWord)
+                                .sort(() => Math.random() - 0.5)
+                                .slice(0, 2);
+        
+        let options = [correctWord, ...distractors].sort(() => Math.random() - 0.5);
+
+        const box = document.getElementById('options-box');
+        box.innerHTML = "";
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'opt-btn';
+            btn.innerText = opt;
+            btn.onclick = () => checkAnswer(opt, correctWord, btn);
+            box.appendChild(btn);
+        });
+
+        playVoice(correctWord);
+    }
+
+    function playVoice(word) {
+        const synth = window.speechSynthesis;
+        const utter = new SpeechSynthesisUtterance(word);
+        utter.lang = 'en-US';
+        utter.rate = 0.8;
+        synth.speak(utter);
+    }
+
+    document.getElementById('speaker-btn').onclick = () => playVoice(gameWords[currentIdx]);
+
+    function checkAnswer(choice, correct, btn) {
+        if (choice === correct) {
+            score += 10;
+            btn.classList.add('correct');
+            document.getElementById('score').innerText = score;
+            setTimeout(() => {
+                currentIdx++;
+                showQuestion();
+            }, 800);
+        } else {
+            btn.classList.add('shake');
+            playVoice(correct); // 答錯再播一次正確發音幫助記憶
+            setTimeout(() => btn.classList.remove('shake'), 400);
+        }
+    }
+
+    function showResult() {
+        document.getElementById('game-ui').classList.add('hidden');
+        document.getElementById('result-ui').style.display = 'block';
+        document.getElementById('final-score').innerText = score;
+        
+        let rank = "繼續加油！";
+        if (score >= 900) rank = "👑 單字之神";
+        else if (score >= 700) rank = "🥇 英文高手";
+        else if (score >= 400) rank = "🥈 潛力無窮";
+        document.getElementById('final-rank').innerText = "等級：" + rank;
+    }
+
+    initGame();
+</script>
+
+</body>
+</html>
